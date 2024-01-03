@@ -107,6 +107,7 @@ class Fireball(pygame.sprite.Sprite):
             self.image = fireball_image[self.frame]
             self.rect.x += self.speed
         elif self.dir == "left":
+            self.image = pygame.transform.flip(fireball_image[self.frame], True, False)
             self.rect.x -= self.speed
         #pygame.sprite.groupcollide(fireball_group, water_group, True, False)
         #pygame.sprite.groupcollide(fireball_group, center_group, True, False)
