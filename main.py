@@ -9,11 +9,16 @@ pygame.font.init()
 pygame.init()
 current_path = os.path.dirname(__file__)
 os.chdir(current_path)
+lvl_game = 1
 WIDTH = 1200
 HEIGHT = 800
 FPS = 60
 sc = pygame.display.set_mode((WIDTH, HEIGHT))
 WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (28, 170, 200)
+MP_BLUE = (0, 0, 255)
 from load import *
 f1 = pygame.font.Font(None, 36)
 clock = pygame.time.Clock()
@@ -24,20 +29,33 @@ camera_group = pygame.sprite.Group()
 class Player(pygame.sprite.Sprite):
     def __init__(self, image, pos):
         pygame.sprite.Sprite.__init__(self)
-
-        self.image = image[0]
+        self.list_image = image
+        self.image = self.list_image[0]
         self.rect = self.image.get_rect()
         self.rect.x = pos[0]
         self.rect.y = pos[1]
         self.speed = 5
+        self.hp = 100
+        self.mp = 100
+        self.qwest_1 = 0
         self.velocity_y = 0
         self.on_ground = True
         self.frame = 0
         self.timer_anime = 0
         self.anime = False
+        self.key = pygame.key.get_pressed()
         self.timer_shot = 0
         self.dir = "right"
 
+    def draw_stats(self):
+
+        width_hp = 96 * (self.hp / 100)
+        width_mp = 96 * (self.mp / 100)
+        pygame.draw.rect(sc, BLACK, (self.rect.x - 30, self.rect.y - 52, 100, 20), 2)
+        pygame.draw.rect(sc, GREEN, (self.rect.x - 27, self.rect.y - 50, width_hp, 15))
+
+        pygame.draw.rect(sc, BLACK, (self.rect.x - 30, self.rect.y - 30, 100, 10), 2)
+        pygame.draw.rect(sc, MP_BLUE, (self.rect.x - 27, self.rect.y - 27, width_mp, 6))
 
 
     def animation(self):
@@ -50,10 +68,8 @@ class Player(pygame.sprite.Sprite):
                     self.frame += 1
                 self.timer_anime = 0
 
-    def update(self):
-        self.animation()
-        key = pygame.key.get_pressed()
-        if key[pygame.K_d]:
+    def move(self):
+        if self.key[pygame.K_d]:
             self.dir = "right"
             self.rect.x += self.speed
             self.anime = True
@@ -61,7 +77,7 @@ class Player(pygame.sprite.Sprite):
             if self.rect.right > 1000:
                 self.rect.right = 1000
                 camera_group.update(-self.speed)
-        elif key[pygame.K_a]:
+        elif self.key[pygame.K_a]:
             self.rect.x -= self.speed
             self.image = pygame.transform.flip(player_image[self.frame], True, False)
             self.dir = "left"
@@ -72,7 +88,8 @@ class Player(pygame.sprite.Sprite):
         else:
             self.anime = False
 
-        if key[pygame.K_SPACE] and self.on_ground:
+    def jump(self):
+        if self.key[pygame.K_SPACE] and self.on_ground:
             self.velocity_y = -15
             self.on_ground = False
         self.rect.y += self.velocity_y
@@ -80,11 +97,23 @@ class Player(pygame.sprite.Sprite):
         if self.velocity_y > 10:
             self.velocity_y = 10
 
-        if key[pygame.K_f] and self.timer_shot / FPS > 1:
+    def attack(self):
+        if self.key[pygame.K_f] and self.timer_shot / FPS > 1:
             bullet = Fireball( self.rect.center, self.dir)
+            self.mp -= 10
             fireball_group.add(bullet)
             self.timer_shot = 0
         self.timer_shot += 1
+
+
+    def update(self):
+        print(self.mp)
+        self.animation()
+        self.attack()
+        self.move()
+        self.jump()
+        self.key = pygame.key.get_pressed()
+        self.draw_stats()
 
 
 
@@ -95,24 +124,23 @@ class Fireball(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = pos[0]
         self.rect.centery = pos[1]
-        self.dir = dir
-        self.speed = 5
         self.frame = 0
-        self.timer_anime = 0
+        self.dir = dir
         self.anime = True
+        self.timer_anime = 0
+        if self.dir == 'left':
+            self.speed = -5
+        else:
+            self.speed = 5
+
     def update(self, step):
-        self.rect.x += step
         self.animation()
-        if self.dir == "right":
+        self.rect.x += step + self.speed
+        if self.speed > 0:
             self.image = fireball_image[self.frame]
-            self.rect.x += self.speed
-        elif self.dir == "left":
+        else:
             self.image = pygame.transform.flip(fireball_image[self.frame], True, False)
-            self.rect.x -= self.speed
-        #pygame.sprite.groupcollide(fireball_group, water_group, True, False)
-        #pygame.sprite.groupcollide(fireball_group, center_group, True, False)
-        #pygame.sprite.groupcollide(fireball_group, earth_group, True, False)
-        #pygame.sprite.groupcollide(fireball_group, box_group, True, False)
+
         pygame.sprite.groupcollide(fireball_group, enemy_group, True, True)
 
     def animation(self):
@@ -235,10 +263,17 @@ class Portal(pygame.sprite.Sprite):
                 self.timer_anime = 0
 
     def update(self, step):
+        global lvl_game
         self.rect.x += step
         self.animation()
         self.image = portal_image[self.frame]
-
+        if lvl_game == 1:
+            if player.qwest_1 == 5:
+                sc.blit(flag_image, (self.rect.center[0] - 10, self.rect.y - 68))
+                if pygame.sprite.spritecollide(self, player_group, False):
+                    lvl_game = 2
+                    restart()
+                    drawMaps('2.txt')
 
 class Monetka(pygame.sprite.Sprite):
     def __init__(self, image, pos):
@@ -255,10 +290,6 @@ class Monetka(pygame.sprite.Sprite):
     def update(self, step):
         global score
         self.rect.x += step
-
-
-
-
         if pygame.sprite.spritecollide(self, player_group, False):
             if abs(self.rect.top - player.rect.bottom) < 15:
                 player.rect.bottom = self.rect.top - 5
@@ -277,6 +308,169 @@ class Monetka(pygame.sprite.Sprite):
 
             print(score)
 
+class HP(pygame.sprite.Sprite):
+    def __init__(self, image, pos):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.x = pos[0]
+        self.rect.y = pos[1]
+
+        self.frame = 0
+        self.timer_anime = 0
+        self.aneme = False
+
+    def update(self, step):
+        global score
+        self.rect.x += step
+        if pygame.sprite.spritecollide(self, player_group, False):
+            if abs(self.rect.top - player.rect.bottom) < 15:
+                player.rect.bottom = self.rect.top - 5
+                player.on_ground = True
+            elif abs(self.rect.bottom - player.rect.top) < 15:
+                player.rect.top = self.rect.bottom + 5
+                player.velocity_y = 0
+            if (abs(self.rect.left - player.rect.right) < 15
+                    and abs(self.rect.centery - player.rect.centery) < 50):
+                player.rect.right = self.rect.left
+            elif (abs(self.rect.right - player.rect.left) < 15
+                  and abs(self.rect.centery - player.rect.centery) < 50):
+                player.rect.left = self.rect.right
+            player.hp = 100
+            self.kill()
+
+class MP(pygame.sprite.Sprite):
+    def __init__(self, image, pos):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.x = pos[0]
+        self.rect.y = pos[1]
+
+        self.frame = 0
+        self.timer_anime = 0
+        self.anime = False
+
+    def update(self, step):
+        global score
+        self.rect.x += step
+        if pygame.sprite.spritecollide(self, player_group, False):
+            if abs(self.rect.top - player.rect.bottom) < 15:
+                player.rect.bottom = self.rect.top - 5
+                player.on_ground = True
+            elif abs(self.rect.bottom - player.rect.top) < 15:
+                player.rect.top = self.rect.bottom + 5
+                player.velocity_y = 0
+            if (abs(self.rect.left - player.rect.right) < 15
+                    and abs(self.rect.centery - player.rect.centery) < 50):
+                player.rect.right = self.rect.left
+            elif (abs(self.rect.right - player.rect.left) < 15
+                  and abs(self.rect.centery - player.rect.centery) < 50):
+                player.rect.left = self.rect.right
+            player.mp = 100
+            self.kill()
+
+
+class NPC_1(pygame.sprite.Sprite):
+    def __init__(self, image, pos):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.x = pos[0]
+        self.rect.y = pos[1]
+
+        self.frame = 0
+        self.timer_anime = 0
+        self.anime = True
+
+    def animation(self):
+        self.image = npc_image[self.frame]
+        if self.anime:
+            self.timer_anime += 1
+            if self.timer_anime / FPS > 0.1:
+                if self.frame == len(npc_image) - 1:
+                    self.frame = 0
+                else:
+                    self.frame += 1
+                    self.timer_anime = 0
+
+    def update(self, step):
+        self.animation()
+        self.rect.x += step
+        if pygame.sprite.spritecollide(self, player_group, False):
+            if lvl_game == 1:
+                sc.blit(qw1_image, (self.rect.x - 30, self.rect.y - 100))
+            elif lvl_game == 1:
+                sc.blit(qw2_image, (self.rect.x - 30, self.rect.y - 100))
+
+
+class Svitok(pygame.sprite.Sprite):
+    def __init__(self, image, pos):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.x = pos[0]
+        self.rect.y = pos[1]
+
+        self.frame = 0
+        self.timer_anime = 0
+        self.aneme = False
+
+    def update(self, step):
+        global score
+        self.rect.x += step
+        if pygame.sprite.spritecollide(self, player_group, False):
+            if abs(self.rect.top - player.rect.bottom) < 15:
+                player.rect.bottom = self.rect.top - 5
+                player.on_ground = True
+            elif abs(self.rect.bottom - player.rect.top) < 15:
+                player.rect.top = self.rect.bottom + 5
+                player.velocity_y = 0
+            if (abs(self.rect.left - player.rect.right) < 15
+                    and abs(self.rect.centery - player.rect.centery) < 50):
+                player.rect.right = self.rect.left
+            elif (abs(self.rect.right - player.rect.left) < 15
+                  and abs(self.rect.centery - player.rect.centery) < 50):
+                player.rect.left = self.rect.right
+            player.qwest_1 += 1
+            self.kill()
+
+
+class Fire(pygame.sprite.Sprite):
+    def __init__(self, image, pos):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.x = pos[0]
+        self.rect.y = pos[1]
+        self.timer_atack = 0
+        self.frame = 0
+        self.timer_anime = 0
+        self.anime = True
+
+    def animation(self):
+        self.image = fire_image[self.frame]
+        if self.anime:
+            self.timer_anime += 1
+            if self.timer_anime / FPS > 0.1:
+                if self.frame == len(fire_image) - 1:
+                    self.frame = 0
+                else:
+                    self.frame += 1
+                    self.timer_anime = 0
+
+    def update(self, step):
+        self.animation()
+        self.rect.x += step
+        self.timer_atack += 1
+        if pygame.sprite.spritecollide(self, player_group, False):
+            if self.timer_atack / FPS > 0.02:
+                player.hp -= 1
+                self.timer_atack  = 0
+
+
+
+
 
 class StopEnemy(pygame.sprite.Sprite):
     def __init__(self, image, pos):
@@ -291,7 +485,7 @@ class StopEnemy(pygame.sprite.Sprite):
 
 
 def restart():
-    global player_group, earth_group, water_group, box_group, center_group, portal_group, monetka_group, stopenemy_group, enemy_group, player,fireball_group
+    global player_group, earth_group, water_group, box_group, center_group, portal_group, monetka_group, stopenemy_group, enemy_group, player,fireball_group,hp_group,mp_group,npc_group,svitok_group, fire_group
 
     player_group = pygame.sprite.Group()
     fireball_group = pygame.sprite.Group()
@@ -303,6 +497,11 @@ def restart():
     monetka_group = pygame.sprite.Group()
     stopenemy_group = pygame.sprite.Group()
     enemy_group = pygame.sprite.Group()
+    hp_group = pygame.sprite.Group()
+    mp_group = pygame.sprite.Group()
+    npc_group = pygame.sprite.Group()
+    svitok_group = pygame.sprite.Group()
+    fire_group = pygame.sprite.Group()
 
     player = Player(player_image, (330, 500))
     player_group.add(player)
@@ -383,7 +582,7 @@ def drawMaps(nameFile):
                 stopenemy_group.add(stopenemy)
                 camera_group.add(stopenemy)
             elif maps[i][j] == "6":
-                monetka = Monetka(item_image[0], pos)
+                monetka = Monetka(monetka_image, pos)
                 monetka_group.add(monetka)
                 camera_group.add(monetka)
             elif maps[i][j] == "7":
@@ -406,11 +605,31 @@ def drawMaps(nameFile):
                 portal = Portal(portal_image, pos)
                 portal_group.add(portal)
                 camera_group.add(portal)
+            elif maps[i][j] == "12":
+                hp = HP(hp_image, pos)
+                hp_group.add(hp)
+                camera_group.add(hp)
+            elif maps[i][j] == "13":
+                mp = MP(mp_image, pos)
+                mp_group.add(mp)
+                camera_group.add(mp)
+            elif maps[i][j] == "14":
+                npc = NPC_1(npc_image[0], pos)
+                mp_group.add(npc)
+                camera_group.add(npc)
+            elif maps[i][j] == "15":
+                svitok = Svitok(svitok_image, pos)
+                svitok_group.add(svitok)
+                camera_group.add(svitok)
+            elif maps[i][j] == "16":
+                fire = Fire(fire_image[0], pos)
+                fire_group.add(fire)
+                camera_group.add(fire)
 
 
 
 def game_lvl():
-    sc.fill('black')
+    sc.fill(BLUE)
     player_group.draw(sc)
     player_group.update()
     earth_group.draw(sc)
@@ -430,6 +649,17 @@ def game_lvl():
     stopenemy_group.update(0)
     enemy_group.update(0)
     enemy_group.draw(sc)
+    hp_group.update(0)
+    hp_group.draw(sc)
+    mp_group.update(0)
+    mp_group.draw(sc)
+    npc_group.update(0)
+    npc_group.draw(sc)
+    svitok_group.update(0)
+    svitok_group.draw(sc)
+    fire_group.draw(sc)
+    fire_group.update(0)
+
 
     text1 = f1.render(str(score), True, (180, 0, 0))
     sc.blit(text1, (1150, 10))
