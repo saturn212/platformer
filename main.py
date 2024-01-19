@@ -518,6 +518,7 @@ class Enemy(pygame.sprite.Sprite):
         self.speed = 1
         self.dir = 1
         self.frame = 0
+        self.timer_atack = 0
         self.timer_anime = 0
         self.anime = True
 
@@ -533,18 +534,27 @@ class Enemy(pygame.sprite.Sprite):
 
     def update(self, step):
         self.rect.x += step
+        self.animation()
+        self.damage()
         if self.dir == 1:
             self.rect.x += self.speed
         elif self.dir == -1:
             self.rect.x -= self.speed
         if pygame.sprite.spritecollide(self, stopenemy_group, False):
             self.dir *= -1
-        self.animation()
+
         if self.dir < 0:
             self.image = self.list_image[self.frame]
             self.image = pygame.transform.flip(self.list_image[self.frame], True, False)
         elif self.dir > 0:
             self.image = self.list_image[self.frame]
+
+    def damage(self):
+        self.timer_atack += 1
+        if pygame.sprite.spritecollide(self, player_group, False):
+            if self.timer_atack / FPS > 0.02:
+                player.hp -= 1
+                self.timer_atack  = 0
 
 
 
